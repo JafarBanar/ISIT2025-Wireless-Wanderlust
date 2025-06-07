@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# Data files
+data/
+*.npy
+*.npz
+*.tfrecords
+*.h5
+*.keras
+*.tflite
+*.pb
+*.ckpt
+*.zip
+
+# Logs and results
+logs/
+outputs/
+checkpoints/
+results/
+*.log
+*.csv
+*.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+ISIT2025_Final_Submission.zip
+submission/ 
