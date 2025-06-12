@@ -132,6 +132,9 @@ def prepare_submission(data_dir: str = 'data/csi_data', output_dir: str = 'submi
                     batch_size = tf.shape(sequence_data)[0]
                     # Reshape to (batch_size * sequence_length, 32, 1024, 2)
                     flattened_data = tf.reshape(sequence_data, [-1, 32, 1024, 2])
+                    
+                    # Convert to single channel by taking mean across the last dimension
+                    flattened_data = tf.reduce_mean(flattened_data, axis=-1, keepdims=True)
                     print(f"\n{name.capitalize()} model input shape (flattened): {flattened_data.shape}")
                     
                     # Get predictions for each timestep
