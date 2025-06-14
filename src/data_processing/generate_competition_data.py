@@ -3,7 +3,7 @@
 import os
 import numpy as np
 from typing import Tuple, Dict
-from src.isit2025.config.competition_config import DATASET_CONFIG
+from src.config.competition_config import DATASET_CONFIG, PATHS
 
 def generate_csi_features(n_samples: int,
                          n_arrays: int,
@@ -102,5 +102,4 @@ def generate_competition_data(output_dir: str) -> Dict[str, np.ndarray]:
     }
 
 if __name__ == "__main__":
-    from src.isit2025.config.competition_config import PATHS
     generate_competition_data(PATHS['data_dir']) 

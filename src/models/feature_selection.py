@@ -1,4 +1,6 @@
 import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras import layers
 import numpy as np
 from typing import Tuple, Dict
 try:
@@ -156,13 +158,16 @@ class ChannelSensor(tf.keras.layers.Layer):
         
         # Create interference estimator
         self.interference_estimator = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(32, (3, 3), activation='relu', padding='same'),
+            tf.keras.layers.Conv1D(32, 3, padding='same', activation='relu'),
             tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.MaxPooling2D((2, 2), padding='same'),
-            tf.keras.layers.Conv2D(64, (3, 3), activation='relu', padding='same'),
+            tf.keras.layers.MaxPooling1D(2, padding='same'),
+            tf.keras.layers.Conv1D(64, 3, padding='same', activation='relu'),
             tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.MaxPooling2D((2, 2), padding='same'),
-            tf.keras.layers.Conv2D(1, (1, 1), activation='sigmoid', padding='same')
+            tf.keras.layers.MaxPooling1D(2, padding='same'),
+            tf.keras.layers.Conv1D(128, 3, padding='same', activation='relu'),
+            tf.keras.layers.GlobalAveragePooling1D(),
+            tf.keras.layers.Dense(64, activation='relu'),
+            tf.keras.layers.Dense(1, activation='sigmoid')
         ])
         
         super().build(input_shape)
@@ -228,14 +233,28 @@ class ChannelSensor(tf.keras.layers.Layer):
         print("Interference shape after reshape:", tf.shape(interference))
         
         # Compute occupancy mask from attention weights
-        # Average attention across frequency: (batch_size, seq_len, n_arrays*n_elements, 1)
-        occupancy_mask = tf.reduce_mean(attention, axis=3)
+        # First reshape attention to (batch_size*seq_len, n_arrays*n_elements, n_freq)
+        attention_reshaped = tf.reshape(
+            attention,
+            [batch_size * seq_len, self.n_arrays * self.n_elements, self.n_freq]
+        )
+        
+        # Average attention across frequency: (batch_size*seq_len, n_arrays*n_elements)
+        occupancy_mask = tf.reduce_mean(attention_reshaped, axis=2)
+        
+        # Add channel dimension: (batch_size*seq_len, n_arrays*n_elements, 1)
+        occupancy_mask = tf.expand_dims(occupancy_mask, axis=-1)
         
         # Reshape to original dimensions: (batch_size, seq_len, n_arrays, n_elements, 1)
         occupancy_mask = tf.reshape(
             occupancy_mask,
             [batch_size, seq_len, self.n_arrays, self.n_elements, 1]
         )
+        
+        # Debug prints
+        print("Attention shape:", tf.shape(attention))
+        print("Attention reshaped shape:", tf.shape(attention_reshaped))
+        print("Occupancy mask shape before final reshape:", tf.shape(occupancy_mask))
         
         return occupancy_mask, interference
     
@@ -372,17 +391,20 @@ class FeatureSelectionModel(tf.keras.Model):
         )
         return instance
 
-class GrantFreeAccessModel(tf.keras.Model):
+@keras.utils.register_keras_serializable()
+class GrantFreeAccessModel(keras.Model):
     """
     Model for grant-free random access with feature selection.
     """
     
-    def __init__(self,
-                 n_arrays: int = 4,
-                 n_elements: int = 8,
-                 n_freq: int = 16,
-                 seq_len: int = 10,
-                 **kwargs):
+    def __init__(
+        self,
+        n_arrays: int = 4,
+        n_elements: int = 8,
+        n_freq: int = 16,
+        seq_len: int = 10,
+        **kwargs
+    ):
         """
         Initialize model.
         
@@ -421,7 +443,7 @@ class GrantFreeAccessModel(tf.keras.Model):
                 name='feature_bn2'
             ),
             tf.keras.layers.TimeDistributed(
-                tf.keras.layers.Dense(n_arrays * n_elements * n_freq, activation='sigmoid'),
+                tf.keras.layers.Dense(n_arrays * n_elements * n_freq * 2, activation='sigmoid'),
                 name='feature_output'
             )
         ])
@@ -481,8 +503,13 @@ class GrantFreeAccessModel(tf.keras.Model):
             [batch_size, seq_len, self.n_arrays * self.n_elements * self.n_freq * 2]
         )
         
+        # Debug prints
+        print("CSI reshaped shape:", tf.shape(csi_reshaped))
+        
         # Feature selection
-        feature_weights = self.feature_selector(csi_reshaped)  # (batch_size, seq_len, n_arrays*n_elements*n_freq)
+        feature_weights = self.feature_selector(csi_reshaped)  # (batch_size, seq_len, n_arrays*n_elements*n_freq*2)
+        
+        print("Feature weights shape:", tf.shape(feature_weights))
         
         # Apply feature weights
         selected_features = csi_reshaped * feature_weights
@@ -507,30 +534,21 @@ class GrantFreeAccessModel(tf.keras.Model):
             'interference': interference  # (batch_size, seq_len, 1)
         }
     
-    def compile(self, optimizer=None, loss=None, metrics=None, loss_weights=None, **kwargs):
-        """
-        Compile model with competition metrics.
-        
-        Args:
-            optimizer: Optimizer instance
-            loss: Loss function(s) for model outputs
-            metrics: Metrics to track during training
-            loss_weights: Weights for different loss terms
-            **kwargs: Additional keyword arguments
-        """
-        if optimizer is None:
-            optimizer = tf.keras.optimizers.Adam(learning_rate=1e-3)
-        
-        # Use provided loss and metrics, or defaults
-        if loss is None:
-            loss = {
+    def compile(self, **kwargs):
+        """Compile model with appropriate losses and metrics."""
+        super().compile(
+            optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
+            loss={
                 'positions': tf.keras.losses.MeanSquaredError(),
                 'occupancy_mask': tf.keras.losses.BinaryCrossentropy(),
                 'interference': tf.keras.losses.MeanSquaredError()
-            }
-        
-        if metrics is None:
-            metrics = {
+            },
+            loss_weights={
+                'positions': 1.0,
+                'occupancy_mask': 0.2,
+                'interference': 0.1
+            },
+            metrics={
                 'positions': [
                     tf.keras.metrics.MeanAbsoluteError(name='mae'),
                     R90Metric(name='r90'),
@@ -538,20 +556,7 @@ class GrantFreeAccessModel(tf.keras.Model):
                 ],
                 'occupancy_mask': ['accuracy'],
                 'interference': ['mse']
-            }
-        
-        if loss_weights is None:
-            loss_weights = {
-                'positions': 1.0,
-                'occupancy_mask': 0.2,
-                'interference': 0.1
-            }
-        
-        super().compile(
-            optimizer=optimizer,
-            loss=loss,
-            metrics=metrics,
-            loss_weights=loss_weights,
+            },
             **kwargs
         )
     
@@ -559,13 +564,13 @@ class GrantFreeAccessModel(tf.keras.Model):
         """Get training callbacks with competition-specific settings."""
         return [
             tf.keras.callbacks.EarlyStopping(
-                monitor='val_location_mae',
+                monitor='val_positions_mae',
                 patience=10,
                 restore_best_weights=True,
                 mode='min'
             ),
             tf.keras.callbacks.ReduceLROnPlateau(
-                monitor='val_location_mae',
+                monitor='val_positions_mae',
                 factor=0.5,
                 patience=5,
                 min_lr=1e-6,
@@ -573,7 +578,7 @@ class GrantFreeAccessModel(tf.keras.Model):
             ),
             tf.keras.callbacks.ModelCheckpoint(
                 f'{model_dir}/best_model.keras',
-                monitor='val_location_mae',
+                monitor='val_positions_mae',
                 save_best_only=True,
                 mode='min'
             ),

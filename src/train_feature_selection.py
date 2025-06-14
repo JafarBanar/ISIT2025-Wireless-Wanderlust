@@ -3,17 +3,14 @@ import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
 import json
-from src.isit2025.models.feature_selection import GrantFreeAccessModel
-from src.isit2025.data_processing.trajectory_data import (
+import argparse
+from typing import Tuple
+from models.feature_selection import GrantFreeAccessModel
+from data_processing.trajectory_data import (
     TrajectoryDataGenerator,
     TrajectoryTFRecordHandler
 )
-from src.isit2025.utils.visualization import (
-    plot_training_history,
-    plot_predictions,
-    plot_error_distribution,
-    plot_feature_importance
-)
+from utils.competition_metrics import R90Metric, CombinedCompetitionMetric
 
 def plot_channel_state(occupancy_mask, interference, save_path):
     """Plot channel state visualization."""
@@ -60,186 +57,133 @@ def calculate_competition_metrics(actual, predicted):
         'combined_metric': combined_metric
     }
 
-def train_model(model_config, train_config, data_dir, output_dir):
-    """Train the grant-free random access model with channel sensing."""
-    # Create output directory
+def train_model(
+    model: tf.keras.Model,
+    train_dataset: tf.data.Dataset,
+    val_dataset: tf.data.Dataset,
+    output_dir: str,
+    epochs: int = 100,
+    batch_size: int = 32,
+    learning_rate: float = 1e-4
+) -> Tuple[tf.keras.Model, tf.keras.callbacks.History]:
+    """Train the model with the given datasets."""
+    # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
-    # Load data
-    print("Loading competition data...")
-    csi_features, positions, priorities = load_competition_data(data_dir)
-    
-    # Create data generator
-    print("Setting up data pipeline...")
-    data_generator = TrajectoryDataGenerator(
-        csi_features=csi_features,
-        positions=positions,
-        sequence_length=model_config['sequence_length'],
-        batch_size=train_config['batch_size'],
-        validation_split=train_config['validation_split']
-    )
-    
-    # Create model
-    print("Creating model...")
-    model = GrantFreeAccessModel(
-        n_features_to_select=model_config['n_features_to_select'],
-        n_priority_levels=model_config['n_priority_levels'],
-        feature_dim=model_config['feature_dim'],
-        dropout_rate=model_config['dropout_rate'],
-        l2_reg=model_config['l2_reg']
-    )
-    
-    # Compile model with competition metrics
-    print("Compiling model...")
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
-        loss={
-            'location': tf.keras.losses.MeanSquaredError(),
-            'priority': tf.keras.losses.SparseCategoricalCrossentropy(),
-            'channel_occupancy': tf.keras.losses.BinaryCrossentropy()
-        },
-        loss_weights={
-            'location': 1.0,
-            'priority': 0.3,
-            'channel_occupancy': 0.2
-        },
-        metrics={
-            'location': [
-                tf.keras.metrics.MeanAbsoluteError(name='mae'),
-                R90Metric(name='r90'),
-                CombinedCompetitionMetric(name='combined_score')
-            ],
-            'priority': ['accuracy'],
-            'channel_occupancy': ['accuracy']
-        }
-    )
-    
     # Get callbacks
-    callbacks = [
-        tf.keras.callbacks.EarlyStopping(
-            monitor='val_location_combined_score',
-            patience=10,
-            restore_best_weights=True,
-            mode='min'
-        ),
-        tf.keras.callbacks.ReduceLROnPlateau(
-            monitor='val_location_combined_score',
-            factor=0.5,
-            patience=5,
-            min_lr=1e-6,
-            mode='min'
-        ),
-        tf.keras.callbacks.ModelCheckpoint(
-            os.path.join(output_dir, 'best_model'),
-            monitor='val_location_combined_score',
-            save_best_only=True,
-            save_format='tf',
-            mode='min'
-        ),
-        tf.keras.callbacks.TensorBoard(
-            log_dir=os.path.join(output_dir, 'logs'),
-            histogram_freq=1,
-            update_freq='epoch'
-        )
-    ]
+    callbacks = model.get_callbacks(output_dir)
     
     # Train model
-    print("Starting training...")
+    print("\nStarting training...")
     history = model.fit(
-        data_generator.get_train_dataset(),
-        validation_data=data_generator.get_val_dataset(),
-        epochs=train_config['epochs'],
+        train_dataset,
+        validation_data=val_dataset,
+        epochs=epochs,
         callbacks=callbacks,
         verbose=1
     )
     
-    # Save training plots
-    print("Generating training plots...")
+    # Save training history
+    print("\nSaving training history...")
+    np.save(os.path.join(output_dir, 'training_history.npy'), history.history)
+    
+    # Generate training plots
+    print("\nGenerating training plots...")
     plot_training_history(history, output_dir)
     
-    # Evaluate on validation set
-    print("Evaluating model...")
-    val_dataset = data_generator.get_val_dataset()
+    # Evaluate model
+    print("\nEvaluating model...")
     val_predictions = model.predict(val_dataset)
+    val_positions = np.concatenate([y['positions'].numpy() for x, y in val_dataset], axis=0)
+    val_priorities = np.concatenate([y['occupancy_mask'].numpy() for x, y in val_dataset], axis=0)
     
-    # Get actual positions from validation set
-    val_positions = np.concatenate([y['location'].numpy() for x, y in val_dataset], axis=0)
+    # Calculate metrics
+    val_mae = np.mean(np.abs(val_predictions['positions'] - val_positions))
+    val_r90 = np.percentile(np.abs(val_predictions['positions'] - val_positions), 90)
+    val_combined_score = (val_mae + val_r90) / 2
     
-    # Calculate competition metrics
-    metrics = calculate_competition_metrics(
-        val_positions,
-        val_predictions['location']
-    )
+    print(f"\nValidation Metrics:")
+    print(f"MAE: {val_mae:.4f}")
+    print(f"R90: {val_r90:.4f}")
+    print(f"Combined Score: {val_combined_score:.4f}")
     
-    # Save metrics to file
-    with open(os.path.join(output_dir, 'metrics.json'), 'w') as f:
-        json.dump(metrics, f, indent=2)
+    # Calculate priority classification metrics
+    val_priority_pred = np.argmax(val_predictions['occupancy_mask'], axis=-1)
+    val_priority_true = np.argmax(val_priorities, axis=-1)
+    val_priority_accuracy = np.mean(val_priority_pred == val_priority_true)
+    print(f"Priority Classification Accuracy: {val_priority_accuracy:.4f}")
     
     # Generate evaluation plots
-    plot_predictions(val_positions, val_predictions['location'], output_dir)
-    plot_error_distribution(val_positions, val_predictions['location'], output_dir)
+    plot_predictions(val_positions, val_predictions['positions'], output_dir)
+    plot_error_distribution(val_positions, val_predictions['positions'], output_dir)
     
     # Plot feature importance
-    feature_importance = np.mean(val_predictions['selection_mask'], axis=0)
-    plot_feature_importance(
-        feature_importance,
-        save_path=os.path.join(output_dir, 'feature_importance.png')
-    )
+    plot_feature_importance(model, output_dir)
     
-    # Plot channel state
-    plot_channel_state(
-        val_predictions['channel_occupancy'],
-        val_predictions['interference'],
-        os.path.join(output_dir, 'channel_state.png')
-    )
-    
-    # Save TFRecord for competition submission
-    print("Saving TFRecord for submission...")
-    tfrecord_handler = TrajectoryTFRecordHandler(
-        sequence_length=model_config['sequence_length']
-    )
-    tfrecord_handler.write_tfrecord(
-        csi_features,
-        positions,
-        os.path.join(output_dir, 'submission.tfrecord')
-    )
-    
-    print("Training complete!")
-    print("\nValidation Metrics:")
-    print(f"MAE: {metrics['mae']:.4f}")
-    print(f"R90: {metrics['r90']:.4f}")
-    print(f"Combined Score: {metrics['combined_metric']:.4f}")
+    print("\nTraining complete!")
     
     return model, history
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Train the grant-free access model')
+    parser.add_argument('--data_dir', type=str, required=True, help='Directory containing competition data')
+    parser.add_argument('--output_dir', type=str, required=True, help='Directory to save model and results')
+    args = parser.parse_args()
+    
     # Model configuration
     model_config = {
-        'sequence_length': 10,
-        'n_features_to_select': 32,
-        'n_priority_levels': 4,
-        'feature_dim': 128,
-        'dropout_rate': 0.3,
-        'l2_reg': 0.01,
-        'energy_threshold': 0.1,  # Added for channel sensing
-        'interference_window': 5   # Added for channel sensing
+        'n_arrays': 4,
+        'n_elements': 8,
+        'n_freq': 16,
+        'seq_len': 10
     }
     
     # Training configuration
     train_config = {
         'batch_size': 32,
         'epochs': 100,
-        'validation_split': 0.2
+        'validation_split': 0.2,
+        'learning_rate': 1e-4
     }
     
-    # Paths
-    data_dir = 'data/competition'
-    output_dir = 'outputs/feature_selection'
+    # Load data
+    print("Loading competition data...")
+    csi_features, positions, priorities = load_competition_data(args.data_dir)
+    
+    # Create data generator
+    print("Setting up data pipeline...")
+    data_generator = TrajectoryDataGenerator(
+        csi_features=csi_features,
+        positions=positions,
+        sequence_length=model_config['seq_len'],
+        batch_size=train_config['batch_size'],
+        validation_split=train_config['validation_split']
+    )
+    
+    # Get datasets
+    train_dataset = data_generator.get_train_dataset()
+    val_dataset = data_generator.get_val_dataset()
+    
+    # Create model
+    print("Creating model...")
+    model = GrantFreeAccessModel(
+        n_arrays=model_config['n_arrays'],
+        n_elements=model_config['n_elements'],
+        n_freq=model_config['n_freq'],
+        seq_len=model_config['seq_len']
+    )
+    
+    # Compile model
+    print("Compiling model...")
+    model.compile()
     
     # Train model
     model, history = train_model(
-        model_config=model_config,
-        train_config=train_config,
-        data_dir=data_dir,
-        output_dir=output_dir
+        model=model,
+        train_dataset=train_dataset,
+        val_dataset=val_dataset,
+        output_dir=args.output_dir,
+        epochs=train_config['epochs'],
+        batch_size=train_config['batch_size'],
+        learning_rate=train_config['learning_rate']
     ) 

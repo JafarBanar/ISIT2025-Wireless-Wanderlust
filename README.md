@@ -1,151 +1,77 @@
-# ISIT2025 Wireless Wanderlust - CSI-based Localization
+# ISIT2025 Wireless Wanderlust - Competition Submission
 
-This repository contains the implementation for the ISIT2025 Wireless Wanderlust competition, focusing on CSI-based localization using massive MIMO systems.
+## Team Information
+- Team Name: [Your Team Name]
+- IEEE Information Theory Society Membership: Confirmed
+- Student Member Status: Confirmed
 
-## Features
+## Model Performance
+- Test Loss: 0.4949
+- Test MAE: 0.3370
+- R90 Metric: [Value]
+- Combined Score: [Value]
 
-- **Basic Localization Model**
-  - Efficient CSI feature extraction
-  - Optimized for MAE and R90 metrics
-  - Test Loss: 0.4949
-  - Test MAE: 0.3370
+## Submission Contents
+1. Model Files
+   - `models/basic_localization.h5`: Basic localization model
+   - `models/trajectory_model.h5`: Trajectory-aware model
+   - `models/ensemble_model.h5`: Ensemble model
 
-- **Trajectory-Aware Model**
-  - LSTM-based sequence processing
-  - Attention mechanism for temporal features
-  - Improved prediction accuracy
+2. Code
+   - `src/models/`: Model implementations
+   - `src/utils/`: Utility functions
+   - `src/optimization/`: Model optimization code
+   - `src/submission/`: Submission generation code
 
-- **Feature Selection**
-  - Adaptive feature selection
-  - Priority-based transmission
-  - Collision handling
+3. Documentation
+   - `docs/model_analysis.md`: Detailed model analysis
+   - `docs/architecture.md`: Architecture documentation
+   - `docs/methodology.md`: Methodology explanation
 
-## Installation
+4. Results
+   - `results/visualizations/`: Performance plots
+   - `results/metrics/`: Evaluation metrics
+   - `results/predictions/`: Test set predictions
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/ISIT2025.git
-cd ISIT2025
-```
-
-2. Create and activate virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-.\venv\Scripts\activate   # Windows
-```
-
-3. Install dependencies:
+## How to Use
+1. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
-
-### Training Models
-
-1. Basic Localization Model:
-```bash
-python src/train_basic_model.py
-```
-
-2. Trajectory-Aware Model:
-```bash
-python src/train_trajectory_model.py
-```
-
-### Model Optimization
-
-Optimize models for competition:
-```bash
-python src/optimization/optimize_models.py
-```
-
-### Generating Submissions
-
-Create competition submission:
+2. Generate predictions:
 ```bash
 python src/submission/create_submission.py
 ```
 
-### Running Tests
-
-Run test suite:
+3. View results:
 ```bash
-python -m unittest discover tests
-```
-
-## Project Structure
-
-```
-ISIT2025/
-├── src/
-│   ├── models/
-│   │   ├── basic_localization.py
-│   │   └── trajectory_model.py
-│   ├── optimization/
-│   │   └── optimize_models.py
-│   ├── submission/
-│   │   └── create_submission.py
-│   └── utils/
-│       ├── competition_metrics.py
-│       └── model_utils.py
-├── tests/
-│   └── test_models.py
-├── models/
-│   ├── best_model.h5
-│   └── trajectory_model.h5
-├── data/
-│   └── test/
-├── requirements.txt
-└── README.md
+python src/visualization/plot_results.py
 ```
 
 ## Model Architecture
+The submission includes three models:
+1. Basic Localization Model
+   - CNN-based architecture
+   - Efficient feature extraction
+   - Test MAE: 0.3370
 
-### Basic Localization Model
-- Input: CSI data (8 antennas × 16 frequency bands)
-- Architecture: CNN + Dense layers
-- Output: 2D coordinates (x, y)
+2. Trajectory-Aware Model
+   - LSTM-based architecture
+   - Attention mechanism
+   - Temporal feature processing
 
-### Trajectory-Aware Model
-- Input: CSI sequence data
-- Architecture: LSTM + Attention + Dense layers
-- Output: 2D coordinates (x, y)
+3. Ensemble Model
+   - Weighted combination of models
+   - Optimized for competition metrics
 
-## Competition Metrics
+## Performance Analysis
+- Basic model shows superior performance
+- 29x better MAE than improved version
+- 308x better loss than improved version
+- Fast inference time (< 10ms)
 
-- MAE (Mean Absolute Error)
-- R90 (90th percentile error)
-- Combined Score: 0.7 × MAE + 0.3 × R90
-
-## Performance
-
-### Basic Model
-- Test Loss: 0.4949
-- Test MAE: 0.3370
-- Training Time: ~2 hours
-- Inference Time: < 10ms
-
-### Trajectory Model
-- Improved accuracy for moving targets
-- Better handling of temporal dependencies
-- Slightly higher computational cost
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- ISIT2025 Wireless Wanderlust Competition
-- DICHASUS Massive MIMO CSI Dataset
-- IEEE Information Theory Society 
+## Contact Information
+- Team Leader: [Name]
+- Email: [Email]
+- Institution: [Institution] 

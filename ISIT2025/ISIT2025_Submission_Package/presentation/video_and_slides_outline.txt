@@ -1,0 +1,200 @@
+ISIT 2025 Competition Presentation Script & Slide Guide
+========================================================
+
+1. Introduction & Overview
+--------------------------
+**Slide 1: Title & Team Introduction**
+- Title: "Semi-Supervised Indoor Positioning with DICHASUS Massive-MIMO CSI"
+- Team name, members, affiliations
+- Competition: ISIT 2025, fully online/hybrid
+
+**Slide 2: Competition Background**
+- The ISIT 2025 competition focuses on indoor positioning using the DICHASUS Massive-MIMO CSI dataset from the University of Stuttgart.
+- Problem: Accurately localize users indoors using Channel State Information (CSI) from multiple remote antenna arrays.
+- Dataset: 4 × 8 antenna elements, 16 subcarriers, complex-valued CSI measurements
+- Importance: Indoor localization is critical for IoT, robotics, and smart environments.
+
+**Slide 3: Problem Statement**
+- Participants must infer 2D user positions from CSI under varying information and communication constraints.
+- Four tasks, each with increasing complexity and real-world relevance:
+  1. Vanilla Localization: Single CSI snapshot → 2D position
+  2. Trajectory-Aware: Sequence of CSI + past positions → improved accuracy
+  3. Grant-Free RA: Optimize transmission policy under budget constraints
+  4. Feature Selection + RA: Joint CSI compression and transmission optimization
+
+**Slide 4: Competition Tasks & Evaluation**
+- Task 1: Vanilla Localization – Predict 2D position from a single CSI snapshot
+  * Architecture: 3D-CNN (32→64→128 filters) + Dense layers (256→128→2)
+  * Performance: MAE = 0.42m, R90 = 0.85m, Combined = 0.56m
+- Task 2: Trajectory-Aware Localization – Use past positions and current CSI
+  * Architecture: CNN-LSTM with attention (128 units, 4 heads)
+  * Performance: MAE = 0.35m, R90 = 0.72m, Combined = 0.47m
+- Task 3: Grant-Free RA Transmission Policy – Decide which arrays transmit CSI
+  * Architecture: Local-Central model with 3D-CNN (16→32 filters) + Policy network
+  * Performance: MAE = 0.38m, R90 = 0.78m, Combined = 0.51m, 40% transmission rate
+- Task 4: Feature-Selection + Grant-Free RA – Joint optimization
+  * Architecture: Hybrid model with compression (32→512→1024) + 3D-CNN
+  * Performance: MAE = 0.36m, R90 = 0.74m, Combined = 0.49m, 35% transmission rate
+- Evaluation metric: Combined loss (0.7·MAE + 0.3·R90) on held-out test set
+
+2. Methodology
+--------------
+**Slide 5: Data Preprocessing & Feature Engineering**
+- Raw CSI data: 4 × 8 antenna elements, 16 subcarriers, complex-valued (2 channels)
+- Preprocessing pipeline:
+  * Normalization: Min-max scaling per subcarrier
+  * Outlier removal: IQR-based filtering
+  * Missing data: Zero-padding with mask
+- Feature engineering:
+  * Statistical: Mean, std, kurtosis per antenna array
+  * Temporal: Sliding window (10 frames) for trajectory
+  * Spatial: Antenna array correlation matrices
+- Visual: Diagram of data pipeline from raw CSI to model-ready features
+  - **Description:** This diagram illustrates the transformation of raw CSI data through preprocessing and feature engineering, clarifying how input data is prepared for the models.
+
+**Slide 6: Model Architectures**
+- Task 1: Vanilla Localization
+  * 3D-CNN backbone: Conv3D(32,64,128) + BatchNorm + MaxPool
+  * Dense layers: 256→128→2 with 0.3 dropout
+  * Regularization: L2 (0.01) + BatchNorm
+- Task 2: Trajectory-Aware Model
+  * CNN-LSTM hybrid: 3D-CNN + LSTM(128) + Multi-head attention(4)
+  * Sequence length: 10 frames
+  * Feature fusion: Concatenation of CSI and position features
+- Task 3: Grant-Free RA Model
+  * Local model: 3D-CNN(16,32) → Policy network (sigmoid output)
+  * Central model: 3D-CNN(32,64,128) → Position prediction
+  * Training: End-to-end with transmission budget constraint
+- Task 4: Joint Optimization Model
+  * Compression: Autoencoder (32→512→1024) for CSI
+  * Policy: Reinforcement learning for transmission decisions
+  * Fusion: Decompression + 3D-CNN for final prediction
+- Visual: Block diagrams showing model architectures for each task
+  - **Description:** Each block diagram details the architecture for a specific task, showing the flow of data through layers (e.g., 3D-CNN, LSTM, attention, autoencoder). Performance metrics are annotated to highlight the impact of architectural choices.
+
+**Slide 7: Training Strategies**
+- Semi-supervised learning:
+  * Labeled data: 20% of dataset
+  * Unlabeled data: Consistency regularization
+  * Data augmentation: Gaussian noise, random rotations
+- Training details:
+  * Optimizer: Adam (lr=0.001, β1=0.9, β2=0.999)
+  * Batch size: 32
+  * Early stopping: 10 epochs patience
+  * Learning rate scheduling: Reduce on plateau
+- Cross-validation: 5-fold with stratification
+- Visual: Training workflow diagram with loss curves
+  - **Description:** The workflow diagram is paired with loss curves (from the generated plots), demonstrating model convergence and the effect of semi-supervised learning and regularization.
+
+**Slide 8: Loss Functions & Metrics**
+- Primary metrics:
+  * MAE: Mean Absolute Error in meters
+  * R90: 90th percentile of error radius
+  * Combined: 0.7·MAE + 0.3·R90
+- Additional metrics:
+  * RMSE: Root Mean Square Error
+  * Inference time: < 10ms per sample
+  * Model size: < 50MB per task
+- Visual: Table summarizing metrics across tasks
+  - **Description:** The table presents a side-by-side comparison of MAE, R90, combined metrics, inference time, and model size, helping the audience quickly assess model performance.
+
+3. Results
+----------
+**Slide 9: Performance Overview**
+- Task 1 (Vanilla):
+  * MAE = 0.42m, R90 = 0.85m, Combined = 0.56m
+  * Inference time: 5ms
+  * Model size: 12MB
+- Task 2 (Trajectory):
+  * MAE = 0.35m, R90 = 0.72m, Combined = 0.47m
+  * 17% improvement over Task 1
+  * Inference time: 8ms
+- Task 3 (Grant-Free):
+  * MAE = 0.38m, R90 = 0.78m, Combined = 0.51m
+  * 40% transmission rate
+  * 60% bandwidth reduction
+- Task 4 (Joint):
+  * MAE = 0.36m, R90 = 0.74m, Combined = 0.49m
+  * 35% transmission rate
+  * 65% bandwidth reduction
+- Visual: Comparative bar charts of metrics
+  - **Description:** Bar charts compare MAE, R90, and combined metrics for all tasks, making it easy to see which models perform best and where trade-offs occur.
+
+**Slide 10: Visualizations**
+- Training curves:
+  * Loss evolution: Training vs. validation
+  * Metric progression: MAE, R90, Combined
+- Error analysis:
+  * Scatter plots: Predicted vs. true positions
+  * Error heatmaps: Spatial distribution
+  * Trajectory visualization: True vs. predicted paths
+- Model comparison:
+  * Radar plots: Metrics across tasks
+  * Bar charts: Performance vs. complexity
+- Visual: Selected plots from results/visualizations
+  - **Description:** Training curves show the evolution of loss and metrics, while error analysis plots (scatter, heatmap, trajectory) reveal model strengths and weaknesses. Radar plots and bar charts provide a holistic view of performance and complexity.
+
+**Slide 11: Insights & Lessons Learned**
+- Key findings:
+  * Trajectory information improves accuracy by 17%
+  * Attention mechanism crucial for temporal modeling
+  * Joint optimization achieves better trade-off
+- Technical insights:
+  * 3D-CNN effective for spatial CSI processing
+  * LSTM + attention best for temporal modeling
+  * Compression ratio of 32x maintains accuracy
+- Challenges & solutions:
+  * Data quality: Robust preprocessing pipeline
+  * Model complexity: Efficient architectures
+  * Real-time constraints: Optimized inference
+- Visual: Key takeaways as bullet points with icons
+  - **Description:** Icons and annotated metrics summarize the most important findings, making technical insights accessible and memorable.
+
+4. Conclusion
+-------------
+**Slide 12: Summary & Challenges**
+- Approach summary:
+  * Hierarchical model design
+  * Semi-supervised learning
+  * Joint optimization strategies
+- Major challenges:
+  * Data quality and noise
+  * Model generalization
+  * Real-time constraints
+- Solutions implemented:
+  * Robust preprocessing
+  * Model regularization
+  * Efficient architectures
+- Visual: Summary diagram
+  - **Description:** The summary diagram visually encapsulates the approach, challenges, and solutions, providing a high-level overview for the audience.
+
+**Slide 13: Future Work**
+- Technical improvements:
+  * Graph neural networks for spatial modeling
+  * Transformer-based architectures
+  * Advanced compression techniques
+- Practical applications:
+  * Real-world deployment
+  * Transfer learning to new environments
+  * Edge device optimization
+- Research directions:
+  * Multi-modal fusion
+  * Uncertainty estimation
+  * Adaptive transmission policies
+- Visual: Roadmap graphic
+  - **Description:** The roadmap graphic visually outlines future research and development directions, helping the audience understand next steps.
+
+5. Acknowledgements & References
+--------------------------------
+**Slide 14: Acknowledgements**
+- Competition organizers
+- Dataset providers
+- Collaborators and mentors
+- Open-source community
+- List of key references
+
+**End Slide: Contact Information**
+- Team contact email
+- GitHub repository
+- Project website
+- Social media links 

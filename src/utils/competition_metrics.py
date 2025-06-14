@@ -1,8 +1,11 @@
-import numpy as np
 import tensorflow as tf
+from tensorflow import keras
+import numpy as np
 from typing import Dict, Tuple, Optional
+import tensorflow_probability as tfp
 
-class R90Metric(tf.keras.metrics.Metric):
+@keras.utils.register_keras_serializable()
+class R90Metric(keras.metrics.Metric):
     """
     R90 metric - radius containing 90% of prediction errors.
     Implements the competition's R90 metric as a Keras metric.
@@ -32,6 +35,7 @@ class R90Metric(tf.keras.metrics.Metric):
             [errors],
             tf.float32
         )
+        batch_r90 = tf.reshape(batch_r90, [])  # Ensure scalar shape
         self.error_accumulator.assign_add(batch_r90)
         self.count.assign_add(1.0)
     
@@ -42,7 +46,8 @@ class R90Metric(tf.keras.metrics.Metric):
         self.error_accumulator.assign(0.0)
         self.count.assign(0.0)
 
-class CombinedCompetitionMetric(tf.keras.metrics.Metric):
+@keras.utils.register_keras_serializable()
+class CombinedCompetitionMetric(keras.metrics.Metric):
     """
     Combined competition metric incorporating both MAE and R90.
     Formula: 0.7 * MAE + 0.3 * R90

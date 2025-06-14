@@ -111,9 +111,9 @@ class TrajectoryDataGenerator:
         
         # Create targets dictionary
         y = {
-            'location': positions[:, -1],  # Last position
-            'priority': np.zeros((len(features), 1), dtype=np.int32),  # Placeholder priorities
-            'channel_occupancy': np.ones_like(features[..., 0])  # Match CSI feature dimensions without complex
+            'positions': positions.astype(np.float32),  # (batch, seq_len, 2)
+            'occupancy_mask': np.ones((len(features), self.sequence_length, 4, 8, 1), dtype=np.float32),
+            'interference': np.zeros((len(features), self.sequence_length, 1), dtype=np.float32)  # Placeholder
         }
         
         # Create dataset

@@ -9,7 +9,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.models.basic_localization import BasicLocalizationModel
-from src.utils.metrics import R90Metric
+from src.utils.competition_metrics import R90Metric
 
 class TestBasicLocalizationModel(unittest.TestCase):
     @classmethod

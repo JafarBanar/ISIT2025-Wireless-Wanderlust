@@ -7,8 +7,8 @@ import numpy as np
 
 BATCH_SIZE = 32
 EPOCHS = 20
-DATA_PATH = 'data/dichasus-cf02.tfrecords'
-CHECKPOINT_DIR = 'models/task3/'
+DATA_PATH = 'data/competition'
+CHECKPOINT_DIR = '../models/task3/'
 
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
@@ -28,7 +28,7 @@ class GrantFreeTrainer:
             transmit_mask = tf.cast(transmit_probs > 0.5, tf.float32)
             
             # Only transmitted CSI reaches the central model
-            transmitted_csi = csi * transmit_mask
+            transmitted_csi = csi * tf.reshape(transmit_mask, [-1, 1, 1, 1, 1])
             
             # Central model predicts position
             position_pred = self.model.central_model(transmitted_csi, training=True)
@@ -104,10 +104,10 @@ class GrantFreeTrainer:
                 if avg_val_losses['total_loss'] < best_val_loss:
                     best_val_loss = avg_val_losses['total_loss']
                     self.model.local_model.save_weights(
-                        os.path.join(CHECKPOINT_DIR, 'best_local_model.h5')
+                        os.path.join(CHECKPOINT_DIR, 'best_local_model.weights.h5')
                     )
                     self.model.central_model.save_weights(
-                        os.path.join(CHECKPOINT_DIR, 'best_central_model.h5')
+                        os.path.join(CHECKPOINT_DIR, 'best_central_model.weights.h5')
                     )
             
             # Print progress

@@ -1,0 +1,57 @@
+import tensorflow as tf
+import os
+from data_loader import CSIDataLoader
+from task1.model import SimpleLocalizationModel
+from utils.plotting import plot_loss
+
+BATCH_SIZE = 32
+EPOCHS = 20
+DATA_PATH = 'data/dichasus-cf02.tfrecords'
+CHECKPOINT_DIR = 'models/task1/'
+
+os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+
+def main():
+    # Data
+    loader = CSIDataLoader(DATA_PATH, batch_size=BATCH_SIZE)
+    train_ds, val_ds = loader.load_dataset(is_training=True)
+    
+    # Model
+    model = SimpleLocalizationModel()
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(1e-3),
+        loss='mae',
+        metrics=['mae']
+    )
+    
+    # Callbacks
+    callbacks = [
+        tf.keras.callbacks.ModelCheckpoint(
+            os.path.join(CHECKPOINT_DIR, 'best_model.h5'),
+            monitor='val_loss',
+            save_best_only=True
+        ),
+        tf.keras.callbacks.EarlyStopping(
+            monitor='val_loss',
+            patience=5,
+            restore_best_weights=True
+        )
+    ]
+    
+    # Training
+    history = model.fit(
+        train_ds,
+        validation_data=val_ds,
+        epochs=EPOCHS,
+        callbacks=callbacks
+    )
+    
+    # Plot training curves
+    plot_loss(
+        history.history['loss'],
+        history.history['val_loss'],
+        save_path=os.path.join(CHECKPOINT_DIR, 'training_loss.png')
+    )
+
+if __name__ == "__main__":
+    main() 

@@ -89,46 +89,37 @@ def plot_prediction_scatter(true_positions: np.ndarray,
     else:
         plt.show()
 
-def plot_predictions(true_positions: np.ndarray,
-                    pred_positions: np.ndarray,
-                    output_dir: str):
-    """
-    Generate prediction visualization plots.
+def plot_predictions(actual_positions: np.ndarray, predicted_positions: np.ndarray, output_dir: str) -> None:
+    """Plot actual vs predicted positions.
     
     Args:
-        true_positions: Ground truth positions (N, 2)
-        pred_positions: Predicted positions (N, 2)
-        output_dir: Directory to save plots
+        actual_positions: Array of actual positions with shape (batch_size, seq_len, 2)
+        predicted_positions: Array of predicted positions with shape (batch_size, seq_len, 2)
+        output_dir: Directory to save the plots
     """
-    # Create output directory
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    # Reshape positions to 2D arrays (batch_size * seq_len, 2)
+    actual_flat = actual_positions.reshape(-1, 2)
+    predicted_flat = predicted_positions.reshape(-1, 2)
     
-    # Plot scatter comparison
+    # Plot scatter plot
     plot_prediction_scatter(
-        true_positions,
-        pred_positions,
-        save_path=str(Path(output_dir) / 'prediction_scatter.png')
+        actual_flat,
+        predicted_flat,
+        save_path=os.path.join(output_dir, 'position_predictions.png')
     )
     
-    # Plot trajectory comparison if we have sequential data
-    if len(true_positions) > 1:
-        timestamps = np.arange(len(true_positions))
-        plot_trajectory(
-            true_positions,
-            timestamps,
-            save_path=str(Path(output_dir) / 'trajectory.png')
-        )
-        
-        # Plot predicted trajectory
-        plot_trajectory(
-            pred_positions,
-            timestamps,
-            save_path=str(Path(output_dir) / 'predicted_trajectory.png')
-        )
+    # Plot error distribution
+    plot_error_distribution(
+        actual_flat,
+        predicted_flat,
+        output_dir=output_dir,
+        save_path=os.path.join(output_dir, 'error_distribution.png')
+    )
 
 def plot_error_distribution(true_positions: np.ndarray,
                           pred_positions: np.ndarray,
-                          output_dir: str):
+                          output_dir: str,
+                          save_path: Optional[str] = None):
     """
     Plot distribution of prediction errors.
     
@@ -136,6 +127,7 @@ def plot_error_distribution(true_positions: np.ndarray,
         true_positions: Ground truth positions (N, 2)
         pred_positions: Predicted positions (N, 2)
         output_dir: Directory to save plots
+        save_path: Optional path to save the plot
     """
     # Calculate errors
     errors = np.sqrt(np.sum((true_positions - pred_positions) ** 2, axis=1))
@@ -146,7 +138,7 @@ def plot_error_distribution(true_positions: np.ndarray,
     # Plot error distribution
     plot_error_distribution_base(
         errors,
-        save_path=str(Path(output_dir) / 'error_distribution.png')
+        save_path=save_path or str(Path(output_dir) / 'error_distribution.png')
     )
 
 def plot_error_distribution_base(errors: np.ndarray,
