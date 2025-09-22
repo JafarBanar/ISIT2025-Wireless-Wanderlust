@@ -1,9 +1,14 @@
 # ISIT2025 Wireless Wanderlust - Competition Submission
 
-## Team Information
-- Team Name: [Your Team Name]
-- IEEE Information Theory Society Membership: Confirmed
-- Student Member Status: Confirmed
+## 🏆 Competition Results
+- **Team Name:** Fading Fighter
+- **Team Member:** Jafar Banar
+- **Result:** **Third Prize** 🥉
+- **Competition:** IEEE ISIT 2025 Wireless Wanderlust (D2I)
+- **Conference:** IEEE International Symposium on Information Theory 2025
+
+## 🚀 Key Innovation
+**Intelligent Grant-Free Transmission for CSI-Based Localization: Achieving 70% Bandwidth Reduction with Competitive Accuracy**
 
 ## Model Performance
 - Test Loss: 0.4949
